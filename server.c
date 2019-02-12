@@ -41,22 +41,23 @@ hnd_get_time(coap_context_t  *ctx UNUSED_PARAM,
 
   if (my_clock_base) {
 
-    /* calculate current time */
+    // calculate current time
     coap_ticks(&t);
     now = my_clock_base + (t / COAP_TICKS_PER_SECOND);
 
     if (query != NULL && coap_string_equal(query, coap_make_str_const("ticks"))) {
-	// output ticks
-          len = snprintf((char *)buf, sizeof(buf), "%u", (unsigned int)now);
+                  // output ticks
+	  len = snprintf((char *)buf, sizeof(buf), "%u", (unsigned int)now);
     } else {      // output human-readable time
       struct tm *tmp;
-      tmp = gmtime(&now);
-      if (!tmp) {
-        // If 'now' is not valid
+      //tmp = gmtime(&now);
+	  tmp = localtime(&now);
+
+      if (!tmp) { // If 'now' is not valid
         response->code = COAP_RESPONSE_CODE(404);
         return;
       } else {
-        len = strftime((char *)buf, sizeof(buf), "%b %d %H:%M:%S", tmp);
+        len = strftime((char *)buf, sizeof(buf), "%F %T %z", tmp);
       }
     }
     coap_add_data_blocked_response(resource, session, request, response, token,
@@ -64,7 +65,7 @@ hnd_get_time(coap_context_t  *ctx UNUSED_PARAM,
                                    len,
                                    buf);
   } else { //404
-    /* if my_clock_base was deleted, we pretend to have no such resource */
+    // if my_clock_base was deleted, we pretend to have no such resource
     response->code = COAP_RESPONSE_CODE(404);
   }
 }
