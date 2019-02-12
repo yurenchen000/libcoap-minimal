@@ -134,6 +134,24 @@ hnd_unknown_put(coap_context_t *ctx,
   hnd_put(ctx, r, session, request, token, query, response);
 
 */
+
+	printf("---put unknown uri: %s %s\n", (const char*)uri_path->s, query ? (const char*)query->s : "");
+
+	size_t size = 0;
+	uint8_t *data;
+	if (coap_get_data(request, &size, &data) && (size > 0)) {
+		printf(" data (%d): %s\n", size, data);
+	}
+	unsigned char buf[101] = "hello";
+
+	int n = snprintf((char*)buf, 100, "---put uri: %s %s", (const char*)uri_path->s, query ? (const char*)query->s : "");
+	snprintf((char*)buf+n, 100-n, "\n data (%d): %s\n", size, data);
+
+	size_t len = strlen((const char*)buf);
+    coap_add_data_blocked_response(resource, session, request, response, token,
+                                   COAP_MEDIATYPE_TEXT_PLAIN, 1,
+                                   len,
+                                   buf);
   return;
 }
 
