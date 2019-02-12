@@ -208,10 +208,19 @@ main(void) {
   coap_startup();
 
   /* resolve destination address where server should be sent */
-  if (resolve_address("localhost", "5683", &dst) < 0) {
+  //if (resolve_address("localhost", "5683", &dst) < 0) {
+  //if (resolve_address("0.0.0.0", "5683", &dst) < 0) {
+  if (resolve_address("::", "5683", &dst) < 0) {
     coap_log(LOG_CRIT, "failed to resolve address\n");
     goto finish;
   }
+
+
+	// show listen addr
+    unsigned char addr_str[INET6_ADDRSTRLEN + 8];
+    if (coap_print_addr(&dst, addr_str, INET6_ADDRSTRLEN + 8)) {
+		printf("udp listen %s\n", addr_str);
+    }
 
   /* create CoAP context and a client session */
   ctx = coap_new_context(nullptr);
