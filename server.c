@@ -10,6 +10,8 @@
 
 */
 
+#define _GNU_SOURCE //pipe2
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -155,7 +157,91 @@ hnd_unknown_put(coap_context_t *ctx,
   return;
 }
 
+/** Returns a textual description of the method or response code. */
+static const char *                                                                                                                                                                                                                         
+msg_code_string(uint16_t c) {
+  static const char *methods[] = { "0.00", "GET", "POST", "PUT", "DELETE",
+                                   "FETCH", "PATCH", "iPATCH" };
+  static const char *signals[] = { "7.00", "CSM", "Ping", "Pong", "Release",
+                                   "Abort" };
+  static char buf[5];
 
+  if (c < sizeof(methods)/sizeof(const char *)) {
+    return methods[c];
+  } else if (c >= 224 && c - 224 < (int)(sizeof(signals)/sizeof(const char *))) {
+    return signals[c-224];
+  } else {
+    snprintf(buf, sizeof(buf), "%u.%02u", c >> 5, c & 0x1f);
+    return buf;
+  }
+}
+
+#include "popen2.c"
+#include <signal.h>
+#include <sys/wait.h>
+
+static char*
+invoke_cgi(
+        coap_pdu_t *request,
+        coap_string_t *query
+){
+
+
+	// parse info
+	char method[20];
+	char   url[255];
+	char query_[255];
+
+	coap_string_t *uri_path;
+	uri_path = coap_get_uri_path(request);
+	if (!uri_path) {
+		return NULL;
+	}
+	
+	snprintf(method, 19, "METHOD=%s", msg_code_string(request->code));
+	snprintf(url,   254, "URI=%s", (const char*)uri_path->s);
+	snprintf(query_, 254, "QUERY=%s", query ? (const char*)query->s : "");
+
+
+    static char buf[1000];
+    struct popen2 kid;
+    char *argv[] = { "./test.cgi", 0 };
+    char *envp[] = {
+        "PATH=/bin:/usr/bin",
+		method,
+		url,
+		query_,
+        0
+    };
+    popen2ve(argv[0], argv, envp, &kid);
+
+	//w stdin
+    write(kid.to_child, "testing\n", 8);
+    close(kid.to_child);
+	//printf("kill(%d, 0) -> %d\n", kid.child_pid, kill(kid.child_pid, 0));	//check if exit
+
+	//r stdout
+	memset(buf, 0, 1000);
+    int n;
+	int i = 0;
+	do {
+		n = read(kid.from_child, &buf[i], 1000);
+		//printf("read (%2d): %s\n", n, &buf[i]);
+		i += n;
+	} while(n>0);
+
+	//printf("kill(%d, 0) -> %d\n", kid.child_pid, kill(kid.child_pid, 0));	//check if exit
+	printf("\n");
+
+	//show result
+    printf("---------from child:--------- (%d)\n%s\n"
+		   "-----------------------------\n\n", i, buf); 
+
+    printf("waitpid() -> %d\n", waitpid(kid.child_pid, NULL, 0));			//clean child
+	printf("kill(%d, 0) -> %d\n", kid.child_pid, kill(kid.child_pid, 0)); 	//check if exit, ok
+
+	return buf;
+}
 static void
 hnd_get_unknown(coap_context_t *ctx UNUSED_PARAM,
         coap_resource_t *resource,
@@ -188,11 +274,15 @@ hnd_get_unknown(coap_context_t *ctx UNUSED_PARAM,
 
 	unsigned char buf[101] = "hello";
 	snprintf((char*)buf, 100, "---get uri: %s %s", (const char*)uri_path->s, query ? (const char*)query->s : "");
-	size_t len = strlen((const char*)buf);
+
+	unsigned char *out = (unsigned char*)invoke_cgi(request, query);
+	if(!out) out = buf;
+	size_t len = strlen((const char*)out);
+
     coap_add_data_blocked_response(resource, session, request, response, token,
                                    COAP_MEDIATYPE_TEXT_PLAIN, 1,
                                    len,
-                                   buf);
+                                   out);
   return;
 }
 
