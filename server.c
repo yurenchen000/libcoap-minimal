@@ -196,6 +196,52 @@ hnd_get_unknown(coap_context_t *ctx UNUSED_PARAM,
   return;
 }
 
+static void
+hnd_post_unknown(coap_context_t *ctx UNUSED_PARAM,
+        coap_resource_t *resource,
+        coap_session_t *session,
+        coap_pdu_t *request,
+        coap_binary_t *token,
+        coap_string_t *query UNUSED_PARAM,
+        coap_pdu_t *response
+) {
+
+	/*
+	 * request will be NULL if an Observe triggered request, so the uri_path,
+	 * if needed, must be abstracted from the resource.
+	 * The uri_path string is a const pointer
+	 */
+	//uri_path = coap_resource_get_uri_path(resource);
+
+	coap_string_t *uri_path;
+	uri_path = coap_get_uri_path(request);
+	if (!uri_path) {
+		response->code = COAP_RESPONSE_CODE(404);
+		return;
+	}
+
+	// request url
+	printf("---post unknown uri: %s %s\n", (const char*)uri_path->s, query ? (const char*)query->s : "");
+
+	// post body
+	size_t size = 0;
+	uint8_t *data;
+	if (coap_get_data(request, &size, &data) && (size > 0)) {
+		printf(" data (%d): %s\n", size, data);
+	}
+
+	// response body
+	unsigned char buf[101] = "hello";
+	int n = snprintf((char*)buf, 100, "---post uri: %s %s", (const char*)uri_path->s, query ? (const char*)query->s : "");
+	snprintf((char*)buf+n, 100-n, "\n data (%d): %s\n", size, data);
+
+	size_t len = strlen((const char*)buf);
+    coap_add_data_blocked_response(resource, session, request, response, token,
+                                   COAP_MEDIATYPE_TEXT_PLAIN, 1,
+                                   len,
+                                   buf);
+	return;
+}
 int
 main(void) {
   coap_context_t  *ctx = nullptr;
@@ -248,6 +294,7 @@ main(void) {
   // unkown uri
   resource = coap_resource_unknown_init(hnd_unknown_put);                                                                                                                                                                                        
   coap_register_handler(resource, COAP_REQUEST_GET, hnd_get_unknown);
+  coap_register_handler(resource, COAP_REQUEST_POST, hnd_post_unknown);
 
   coap_add_resource(ctx, resource);
 
