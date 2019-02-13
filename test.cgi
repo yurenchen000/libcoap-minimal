@@ -12,5 +12,5 @@ echo ------ end.
 #exec 1>&-
 #exec 2>&-
 #exit
-echo hello
+#echo hello
 
