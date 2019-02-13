@@ -187,7 +187,7 @@ invoke_cgi(
 ){
 
 
-	// parse info
+	// ------ parse info
 	char method[20];
 	char   url[255];
 	char query_[255];
@@ -202,7 +202,15 @@ invoke_cgi(
 	snprintf(url,   254, "URI=%s", (const char*)uri_path->s);
 	snprintf(query_, 254, "QUERY=%s", query ? (const char*)query->s : "");
 
+	// post body
+	size_t size = 0;
+	uint8_t *data = NULL;
+	if (coap_get_data(request, &size, &data) && (size > 0)) {
+		printf(" data (%d): %s\n", size, data);
+	}
 
+
+	// ------ exec
     static char buf[1000];
     struct popen2 kid;
     char *argv[] = { "./test.cgi", 0 };
@@ -216,7 +224,10 @@ invoke_cgi(
     popen2ve(argv[0], argv, envp, &kid);
 
 	//w stdin
-    write(kid.to_child, "testing\n", 8);
+	if(data && size > 0)
+		write(kid.to_child, data, size);
+    //write(kid.to_child, "testing\n", 8);
+
     close(kid.to_child);
 	//printf("kill(%d, 0) -> %d\n", kid.child_pid, kill(kid.child_pid, 0));	//check if exit
 
@@ -325,11 +336,13 @@ hnd_post_unknown(coap_context_t *ctx UNUSED_PARAM,
 	int n = snprintf((char*)buf, 100, "---post uri: %s %s", (const char*)uri_path->s, query ? (const char*)query->s : "");
 	snprintf((char*)buf+n, 100-n, "\n data (%d): %s\n", size, data);
 
-	size_t len = strlen((const char*)buf);
+	unsigned char *out = (unsigned char*)invoke_cgi(request, query);
+	if(!out) out = buf;
+	size_t len = strlen((const char*)out);
     coap_add_data_blocked_response(resource, session, request, response, token,
                                    COAP_MEDIATYPE_TEXT_PLAIN, 1,
                                    len,
-                                   buf);
+                                   out);
 	return;
 }
 int
