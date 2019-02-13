@@ -182,6 +182,7 @@ msg_code_string(uint16_t c) {
 
 static char*
 invoke_cgi(
+        coap_session_t *session,
         coap_pdu_t *request,
         coap_string_t *query
 ){
@@ -191,6 +192,7 @@ invoke_cgi(
 	char method[20];
 	char   url[255];
 	char query_[255];
+	char addr_[128];
 
 	coap_string_t *uri_path;
 	uri_path = coap_get_uri_path(request);
@@ -209,6 +211,11 @@ invoke_cgi(
 		printf(" data (%d): %s\n", size, data);
 	}
 
+	// remote addr
+	char addr[40];
+	coap_print_addr(&session->remote_addr, (unsigned char*)addr, 40); //server should listen on ipv4, in order to get ipv4 addr
+	snprintf(addr_, 254, "ADDR=%s", addr);
+
 
 	// ------ exec
     static char buf[1000];
@@ -219,6 +226,7 @@ invoke_cgi(
 		method,
 		url,
 		query_,
+		addr_,
         0
     };
     popen2ve(argv[0], argv, envp, &kid);
@@ -286,7 +294,7 @@ hnd_get_unknown(coap_context_t *ctx UNUSED_PARAM,
 	unsigned char buf[101] = "hello";
 	snprintf((char*)buf, 100, "---get uri: %s %s", (const char*)uri_path->s, query ? (const char*)query->s : "");
 
-	unsigned char *out = (unsigned char*)invoke_cgi(request, query);
+	unsigned char *out = (unsigned char*)invoke_cgi(session, request, query);
 	if(!out) out = buf;
 	size_t len = strlen((const char*)out);
 
@@ -336,7 +344,7 @@ hnd_post_unknown(coap_context_t *ctx UNUSED_PARAM,
 	int n = snprintf((char*)buf, 100, "---post uri: %s %s", (const char*)uri_path->s, query ? (const char*)query->s : "");
 	snprintf((char*)buf+n, 100-n, "\n data (%d): %s\n", size, data);
 
-	unsigned char *out = (unsigned char*)invoke_cgi(request, query);
+	unsigned char *out = (unsigned char*)invoke_cgi(session, request, query);
 	if(!out) out = buf;
 	size_t len = strlen((const char*)out);
     coap_add_data_blocked_response(resource, session, request, response, token,
@@ -358,8 +366,8 @@ main(void) {
 
   /* resolve destination address where server should be sent */
   //if (resolve_address("localhost", "5683", &dst) < 0) {
-  //if (resolve_address("0.0.0.0", "5683", &dst) < 0) {
-  if (resolve_address("::", "5683", &dst) < 0) {
+  if (resolve_address("0.0.0.0", "5683", &dst) < 0) {
+  //if (resolve_address("::", "5683", &dst) < 0) {
     coap_log(LOG_CRIT, "failed to resolve address\n");
     goto finish;
   }
