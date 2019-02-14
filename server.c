@@ -187,7 +187,6 @@ invoke_cgi(
         coap_string_t *query
 ){
 
-
 	// ------ parse info
 	char method[20];
 	char   url[255];
@@ -202,7 +201,7 @@ invoke_cgi(
 	
 	snprintf(method, 19, "METHOD=%s", msg_code_string(request->code));
 	snprintf(url,   254, "URI=%s", (const char*)uri_path->s);
-	snprintf(query_, 254, "QUERY=%s", query ? (const char*)query->s : "");
+	snprintf(query_,254, "QUERY=%s", query ? (const char*)query->s : "");
 
 	// post body
 	size_t size = 0;
@@ -215,7 +214,7 @@ invoke_cgi(
 	char addr[40];
 	coap_print_addr(&session->remote_addr, (unsigned char*)addr, 40); //server should listen on ipv4, in order to get ipv4 addr
 	snprintf(addr_, 254, "ADDR=%s", addr);
-
+	printf(" addr: %s\n", addr);
 
 	// ------ exec
     static char buf[1000];
@@ -253,11 +252,11 @@ invoke_cgi(
 	printf("\n");
 
 	//show result
-    printf("---------from child:--------- (%d)\n%s\n"
-		   "-----------------------------\n\n", i, buf); 
-
-    printf("waitpid() -> %d\n", waitpid(kid.child_pid, NULL, 0));			//clean child
-	printf("kill(%d, 0) -> %d\n", kid.child_pid, kill(kid.child_pid, 0)); 	//check if exit, ok
+    printf("\e[36m>> ------ cgi_out: \e[0m%d (%d)\n", kid.child_pid, i);
+    printf("\e[01;30m%s\e[0m\n", buf); 
+	int wait_pid = waitpid(kid.child_pid, NULL, 0);			//clean child
+    printf("\e[36m<< ------ cgi_end: \e[0m%d\n", wait_pid);
+	//printf("kill(%d, 0) -> %d\n", kid.child_pid, kill(kid.child_pid, 0)); 	//check if exit, ok
 
 	return buf;
 }
@@ -281,15 +280,15 @@ hnd_get_unknown(coap_context_t *ctx UNUSED_PARAM,
    */
   //uri_path = coap_resource_get_uri_path(resource);
 
-  coap_string_t *uri_path;
-  uri_path = coap_get_uri_path(request);
-  if (!uri_path) {
-    response->code = COAP_RESPONSE_CODE(404);
-    return;
-  }
+	coap_string_t *uri_path;
+	uri_path = coap_get_uri_path(request);
+	if (!uri_path) {
+		response->code = COAP_RESPONSE_CODE(404);
+		return;
+	}
 
 	//printf("---query: %p\n", query);
-	printf("---get unknown uri: %s %s\n", (const char*)uri_path->s, query ? (const char*)query->s : "");
+	printf("\n\n\e[45;33;01m============  GET uri:\e[0m %s %s\n\e[0m", (const char*)uri_path->s, query ? (const char*)query->s : "");
 
 	unsigned char buf[101] = "hello";
 	snprintf((char*)buf, 100, "---get uri: %s %s", (const char*)uri_path->s, query ? (const char*)query->s : "");
@@ -330,8 +329,9 @@ hnd_post_unknown(coap_context_t *ctx UNUSED_PARAM,
 	}
 
 	// request url
-	printf("---post unknown uri: %s %s\n", (const char*)uri_path->s, query ? (const char*)query->s : "");
+	printf("\n\n\e[45;39;01m============ POST uri:\e[0m %s %s\n\e[0m", (const char*)uri_path->s, query ? (const char*)query->s : "");
 
+	/*
 	// post body
 	size_t size = 0;
 	uint8_t *data;
@@ -343,9 +343,11 @@ hnd_post_unknown(coap_context_t *ctx UNUSED_PARAM,
 	unsigned char buf[101] = "hello";
 	int n = snprintf((char*)buf, 100, "---post uri: %s %s", (const char*)uri_path->s, query ? (const char*)query->s : "");
 	snprintf((char*)buf+n, 100-n, "\n data (%d): %s\n", size, data);
+	*/
 
 	unsigned char *out = (unsigned char*)invoke_cgi(session, request, query);
-	if(!out) out = buf;
+	//if(!out) out = buf;
+	if(!out) out = uri_path->s;
 	size_t len = strlen((const char*)out);
     coap_add_data_blocked_response(resource, session, request, response, token,
                                    COAP_MEDIATYPE_TEXT_PLAIN, 1,
